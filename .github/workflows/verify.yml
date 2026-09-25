@@ -1,0 +1,49 @@
+name: Verify fleet operations
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: isolated-ci-password
+          MYSQL_DATABASE: fleet
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m venv apps/api/.venv
+      - run: apps/api/.venv/bin/python -m pip install -r apps/api/requirements.lock.txt
+      - run: npm run api:test
+      - run: apps/api/.venv/bin/python apps/api/manage.py makemigrations --check --dry-run --settings=config.settings_test
+      - name: Test MySQL migrations, constraints and API
+        run: npm run api:test
+        env:
+          FLEET_TEST_MYSQL: '1'
+          DB_NAME: fleet
+          DB_USER: root
+          DB_PASSWORD: isolated-ci-password
+          DB_HOST: 127.0.0.1
+      - run: npm run web:install
+      - run: npm run web:check
+      - run: npm --prefix apps/web run lint
+      - run: npm run web:build
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run test:browser
+        working-directory: apps/web
+      - run: docker build -t fleet-api-check apps/api
+      - run: docker build -t fleet-web-check apps/web

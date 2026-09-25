@@ -1,0 +1,14 @@
+{
+  "name": "fleet-operations",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "web:install": "node tools/run.mjs web:install",
+    "web:dev": "node tools/run.mjs web:dev",
+    "web:build": "node tools/run.mjs web:build",
+    "web:check": "node tools/run.mjs web:check",
+    "web:preview": "node tools/run.mjs web:preview",
+    "api:test": "node tools/run.mjs api:test",
+    "api:dev": "node tools/run.mjs api:dev"
+  }
+}
