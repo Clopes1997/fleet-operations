@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import api, { type Truck } from "./services/api";
 type Page<T> = {
@@ -45,12 +45,18 @@ export function ServiceOrders() {
     [busy, setBusy] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]),
     [vehicles, setVehicles] = useState<Truck[]>([]);
+  const requestVersion = useRef(0);
+  const currentQuery = useRef({page, status, search});
+  currentQuery.current = {page, status, search};
   async function reload() {
+    const version = ++requestVersion.current;
     try {
-      const r = await api.get("/orders/", { params: { page, status, search } });
+      const r = await api.get("/orders/", { params: currentQuery.current });
+      if (version !== requestVersion.current) return;
       setOrders(r.data);
       setError("");
     } catch (e) {
+      if (version !== requestVersion.current) return;
       setError(message(e));
     }
   }
