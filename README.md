@@ -1,5 +1,10 @@
 # Fleet operations
 
+Migration validation now includes deterministic identity review, exact reconciliation and
+disposable MySQL backup/restore acceptance. See [Retirement Readiness](RETIREMENT.md) for
+commands, reusable review files and rollback boundaries. Passing checks never authorizes
+archival of a source repository or migration of an unknown production installation.
+
 A modular fleet and service-order application built from Trucks System, with the useful
 Service Orders workflow integrated into Django and React. It manages vehicles, reviewed
 customer records, generic or vehicle-linked service orders, deadlines, quoted values,

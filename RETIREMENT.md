@@ -1,5 +1,119 @@
 # Retirement Readiness
 
+## Fleet migration validation
+
+Run from the repository root after installing the existing Python virtual environment,
+frontend dependencies, Docker Compose and Playwright browser:
+
+```bash
+npm run migration:test
+npm run api:test
+npm run web:check
+npm --prefix apps/web run lint
+npm run web:build
+npm --prefix apps/web run test:browser
+npm run migration:rehearse -- --snapshot tools/migration/fixtures/fleet-source.json --currency BRL --kind synthetic --out migration-runs/rehearsal-01
+node tools/migration/verify-rehearsal.mjs migration-runs/rehearsal-01/migration-report.json
+```
+
+The rehearsal returns 2 for incomplete/unapproved readiness, 1 for failure. Exit 2 alone
+does not prove a pass: the verifier checks mandatory evidence. Use a new output directory
+for each run. Local browser tests use installed Chrome; Linux CI installs Chromium with
+`cd apps/web && npx playwright install --with-deps chromium`.
+
+The runner creates unique MySQL 8.4 volumes, initializes the clean Django lineage, imports
+twice, reconciles actual fields/IDs/decimal totals, runs dedicated retirement tests on MySQL,
+and exercises production containers through temporary HTTPS. Secure cookies, CSRF, sessions
+and model permissions remain enabled. It restarts the application, dumps the target,
+restores into a second empty MySQL database, verifies fingerprints and browser acceptance,
+then switches back and compares again. Generated volumes are removed; reports remain.
+No legacy database URL is accepted.
+
+### Input and identity review
+
+Version-1 service-orders/trucks-system bundles remain supported. Version 2 supports customer,
+vehicle, order and history rows; see tools/migration/fixtures/fleet-source.json. Identity is
+(source, installation, type, source ID). order.customer/order.vehicle and history.order use
+source IDs. Quotes and FIPE values require decimal strings with at most two places. Quote
+currency is explicit; FIPE valuations are BRL. Deadlines are calendar dates. Instants need
+explicit offsets: naive timestamps are rejected. ImportRecord.payload retains original rows.
+
+Preflight classifies exact matches, new records, conflicts, possible duplicates and invalid
+records. Equal names/plates only suggest candidates; nothing is fuzzy-merged. Active plate
+collisions, archived/active collisions, changed prior imports, missing references and
+unsupported values block import. History must form an unambiguous ordered chain ending
+at the source order status. Missing history/actors are never fabricated. Customer names
+without actual relationships remain snapshots. Vehicle ownership is not modeled: supplied
+ownership fields require review rather than being silently discarded.
+
+preflight.json provides source IDs and candidate target IDs/fingerprints. review-template.json
+is reusable and bound to a canonical source fingerprint. Example decisions:
+
+```json
+{
+  "sourceSha256": "copy the exact value from preflight.json",
+  "decisions": {
+    "customer:c1": {"action": "map", "targetId": 12, "targetSha256": "copy candidate fingerprint"},
+    "vehicle:v1": {"action": "new"},
+    "vehicle:old": {"action": "skip", "reason": "Owner chooses archival-only retention"},
+    "order:o1": {"action": "defer"}
+  }
+}
+```
+
+map requires matching fields and target fingerprint; it never overwrites a differing target.
+new acknowledges possible duplication but cannot bypass active-plate uniqueness. skip
+preserves raw evidence without an active target and leaves reconciliation REQUIRES_REVIEW;
+references to skipped records block dependent imports. defer blocks import. Reruns require
+the same decisions; changed sources or decisions are rejected.
+
+Supply `--decisions path/to/review.json` to the root runner. It always starts empty.
+Mapping to existing targets therefore requires a separately restored disposable target copy;
+run the underlying commands inside apps/api with its configured virtual environment:
+
+```bash
+python manage.py migration_rehearsal preflight --snapshot /private/source.json --out /private/preflight.json
+python manage.py migration_rehearsal import --snapshot /private/source.json --decisions /private/review.json --out /private/import.json
+python manage.py migration_rehearsal reconcile --snapshot /private/source.json --out /private/reconciliation.json
+```
+
+These commands refuse databases unless FLEET_MIGRATION_DISPOSABLE=1 and DB_NAME starts with
+rehearsal_. Never rename/reuse a live database to satisfy this safeguard; restore a copy.
+Keep that disposable target stable while reviewing fingerprints. Review files are private
+evidence, not public source code.
+
+### Controlled FIPE verification
+
+Offline tests cover exact decimal quotes/metadata, unavailable service, ambiguous year
+selection and malformed responses. The read-only live probe follows service-provided catalog
+codes, preserves metadata and never matches/values a local vehicle:
+
+```powershell
+apps/api/.venv/Scripts/python.exe tools/migration/fipe-live.py --live --out migration-runs/fipe-live.json
+```
+
+On Linux use apps/api/.venv/bin/python. Create the output parent first. Failure reports
+REQUIRES_REVIEW; ordinary vehicle CRUD remains independent. The controlled probe passed
+locally on 2026-09-25; future service availability is not guaranteed.
+
+### Backup and rollback
+
+Back up the full MySQL target, identity mappings, users/history, immutable source copies,
+review decisions, application commit/image and deployment configuration. Store secrets
+separately, outside reports and Git. target-backup.sql contains private records/password
+hashes. SHA-256 checks identity; actual restoration and record comparison check usability.
+Share only reviewed migration-report.json and migration-report.md. Raw source, SQL, review
+files and temporary TLS private keys remain in the ignored rehearsal directory.
+
+Automated rollback switches database routing at the same application commit. Actual version
+rollback needs the previous application image and a compatible database snapshot. Stop writes
+before the final snapshot/cutover, compare restored data and agree a write-free acceptance
+window. Restoring an older snapshot after new writes loses those writes unless separately
+reconciled. Do not run backward schema migrations on live data. Real version rollback,
+downtime and consistency boundaries remain REQUIRES_REVIEW until a production baseline and
+owner-approved cutover plan exist.
+
+
 Source → Backup → Isolated restore → Preflight → Migration → Reconciliation → Acceptance tests → Restore/rollback test → Human review → Cutover approval → Source archival
 
 **Passing automated checks does not authorize deletion or archival of the source.**
