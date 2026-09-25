@@ -1,6 +1,11 @@
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 const windows=process.platform==='win32'
+if (process.argv[2] === 'migration:inspect' || process.argv[2] === 'migration:test') {
+ const test = process.argv[2] === 'migration:test'
+ const result = spawnSync(process.execPath, test ? ['--test', 'tools/migration/report.test.mjs'] : ['tools/migration/report.mjs', ...process.argv.slice(3)], {cwd:fileURLToPath(new URL('../',import.meta.url)),stdio:'inherit',shell:false})
+ process.exit(result.status ?? 1)
+}
 const tasks={
  'web:install':['apps/web','npm',['ci']],
  'web:dev':['apps/web','npm',['run','dev']],

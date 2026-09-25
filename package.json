@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
+    "migration:inspect": "node tools/run.mjs migration:inspect",
+    "migration:test": "node tools/run.mjs migration:test",
     "web:install": "node tools/run.mjs web:install",
     "web:dev": "node tools/run.mjs web:dev",
     "web:build": "node tools/run.mjs web:build",

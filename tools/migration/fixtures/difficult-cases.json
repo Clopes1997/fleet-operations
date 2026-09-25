@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic",
+  "description": "Deliberately invalid or ambiguous examples; no real source data.",
+  "cases": [
+    {
+      "id": "duplicate-id",
+      "domain": "all",
+      "records": [
+        {
+          "id": "1"
+        },
+        {
+          "id": "1"
+        }
+      ],
+      "expected": "FAIL"
+    },
+    {
+      "id": "orphan-reference",
+      "domain": "inventory",
+      "records": [
+        {
+          "type": "recipe",
+          "legacyId": "r1",
+          "product": "missing",
+          "material": "m1",
+          "quantity": "1.0000"
+        }
+      ],
+      "expected": "FAIL"
+    },
+    {
+      "id": "identity-conflict",
+      "domain": "fleet",
+      "records": [
+        {
+          "id": "v1",
+          "plate": "ABC1D23",
+          "model": "A"
+        },
+        {
+          "id": "v2",
+          "plate": "ABC1D23",
+          "model": "B"
+        }
+      ],
+      "expected": "REQUIRES_REVIEW"
+    },
+    {
+      "id": "negative-stock",
+      "domain": "inventory",
+      "records": [
+        {
+          "id": "p1",
+          "stock": -1
+        }
+      ],
+      "expected": "FAIL"
+    },
+    {
+      "id": "naive-time",
+      "domain": "all",
+      "records": [
+        {
+          "id": "1",
+          "createdAt": "2026-11-01T01:30:00"
+        }
+      ],
+      "expected": "REQUIRES_REVIEW"
+    },
+    {
+      "id": "decimal-precision",
+      "domain": "fleet",
+      "records": [
+        {
+          "id": "o1",
+          "quoted_value": "12.345"
+        }
+      ],
+      "expected": "REQUIRES_REVIEW"
+    },
+    {
+      "id": "duplicate-active-plate",
+      "domain": "fleet",
+      "records": [
+        {
+          "id": "1",
+          "plate": "ABC1D23",
+          "active": true
+        },
+        {
+          "id": "2",
+          "plate": "ABC1D23",
+          "active": true
+        }
+      ],
+      "expected": "REQUIRES_REVIEW"
+    },
+    {
+      "id": "repeated-import",
+      "domain": "all",
+      "records": [
+        {
+          "source": "fixture",
+          "installation": "one",
+          "id": "1",
+          "fingerprint": "same"
+        },
+        {
+          "source": "fixture",
+          "installation": "one",
+          "id": "1",
+          "fingerprint": "same"
+        }
+      ],
+      "expected": "PASS"
+    },
+    {
+      "id": "stale-revision",
+      "domain": "personal",
+      "records": [
+        {
+          "expectedRevision": 1,
+          "actualRevision": 2
+        }
+      ],
+      "expected": "FAIL"
+    },
+    {
+      "id": "malformed-backup",
+      "domain": "personal",
+      "raw": "{broken",
+      "expected": "FAIL"
+    },
+    {
+      "id": "unsupported-backup-version",
+      "domain": "personal",
+      "records": [
+        {
+          "version": 999
+        }
+      ],
+      "expected": "FAIL"
+    }
+  ]
+}

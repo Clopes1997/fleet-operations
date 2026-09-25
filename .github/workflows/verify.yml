@@ -17,6 +17,8 @@ jobs:
           --health-interval=5s --health-timeout=5s --health-retries=30
     steps:
       - uses: actions/checkout@v4
+      - name: Migration report contract tests
+        run: node --test tools/migration/report.test.mjs
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
