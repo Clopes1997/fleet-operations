@@ -79,8 +79,14 @@ def validate_row(row):
     if kind not in MODELS:
         raise ValueError("Unknown entity type")
     data = {key: value for key, value in row.items() if key in FIELDS[kind] and not key.endswith("_id")}
+    if any(key.endswith("_id") for key in row):
+        raise ValueError("Use explicit source relationship names, not unresolved database foreign keys")
+    if kind != "history":
+        data.setdefault("deleted_at", None)
     for key in ("deleted_at", "created_at", "updated_at", "occurred_at"):
         if key in data:
+            if key != "deleted_at" and data[key] is None:
+                raise ValueError("Present source timestamps cannot be null")
             data[key] = timestamp(data[key])
     if kind == "customer":
         data.setdefault("notes", "")
@@ -246,6 +252,11 @@ def preflight(raw, decisions=None):
                 if item["key"] in {"history:" + r["id"] for r in history} and item["status"] == "PASS":
                     item.update(classification="conflict", status="REQUIRES_REVIEW")
                     item["issues"].append("Ambiguous timestamps, invalid transition or incomplete status chain; no missing events invented")
+    known = ImportRecord.objects.filter(source=bundle["source"], installation=bundle["installation"], entity__startswith="reviewed-")
+    for previous in known:
+        key = previous.entity.removeprefix("reviewed-") + ":" + previous.legacy_id
+        if key not in indexed:
+            records.append({"key": key, "classification": "conflict", "status": "REQUIRES_REVIEW", "issues": ["Previously imported identity absent from this full snapshot"], "candidates": []})
     status = "FAIL" if any(r["status"] == "FAIL" for r in records) else "REQUIRES_REVIEW" if any(r["status"] != "PASS" for r in records) else "PASS"
     return bundle, prepared, {"status": status, "sourceSha256": digest(raw), "records": records,
                              "reviewTemplate": {"sourceSha256": digest(raw), "decisions": {r["key"]: {"action": "defer"} for r in records if r["status"] != "PASS"}}}
@@ -334,5 +345,10 @@ def reconcile(raw):
                 totals["target"][total] = format(Decimal(totals["target"][total]) + Decimal(actual[field]), ".2f")
         identities.append({"key": key, "targetId": obj.pk, "installation": bundle["installation"]})
         rows.append({"key": key, "sha256": digest(actual)})
+    expected_keys = {r["type"] + ":" + r["id"] for r in bundle["rows"]}
+    for mapping in ImportRecord.objects.filter(source=bundle["source"], installation=bundle["installation"], entity__startswith="reviewed-"):
+        key = mapping.entity.removeprefix("reviewed-") + ":" + mapping.legacy_id
+        if key not in expected_keys:
+            differences.append({"key": key, "code": "UNEXPECTED_PRIOR_MAPPING"})
     return {"status": "FAIL" if differences else "REQUIRES_REVIEW" if skipped else "PASS",
             "counts": counts, "totals": totals, "discrepancies": differences, "identities": identities, "observed": rows, "archivalOnly": skipped}

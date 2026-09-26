@@ -109,3 +109,17 @@ class RetirementAcceptance(TestCase):
         source["rows"].append({**source["rows"][3],"id":"h2","previous_status":"em_andamento","next_status":"concluido"})
         source["rows"][2]["status"]="concluido"
         self.assertEqual(preflight(source)[2]["status"],"REQUIRES_REVIEW")
+    def test_database_foreign_key_fields_cannot_be_silently_discarded(self):
+        source=self.source();source["rows"][2].pop("customer");source["rows"][2]["customer_id"]=1
+        self.assertEqual(preflight(source)[2]["status"],"FAIL")
+    def test_removed_source_rows_require_review(self):
+        source=self.source();apply_reviewed(source)
+        source["rows"]=source["rows"][:-1]
+        self.assertEqual(preflight(source)[2]["status"],"REQUIRES_REVIEW")
+        self.assertEqual(reconcile(source)["status"],"FAIL")
+    def test_active_customer_cannot_map_to_archived_target(self):
+        source=self.source()
+        Customer.objects.create(display_name="Synthetic customer",notes="Fixture only",deleted_at="2020-01-01T00:00:00Z")
+        candidate=preflight(source)[2]["records"][0]["candidates"][0]
+        decision={"sourceSha256":digest(source),"decisions":{"customer:c1":{"action":"map",**candidate}}}
+        self.assertEqual(preflight(source,decision)[2]["status"],"FAIL")
