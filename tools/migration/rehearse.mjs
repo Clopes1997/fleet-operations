@@ -14,7 +14,11 @@ for(let i=0;i<args.length;i+=2){
 let report,stage='preflight',substage='input',env,compose,project,started=false,output;
 function command(executable,args,input){
  const result=spawnSync(executable,args,{cwd:root,env,encoding:'utf8',input,timeout:900000,maxBuffer:64*1024*1024});
- if(result.status!==0)throw new Error('Execution failed at '+substage);
+ if(result.status!==0){
+  const errorClasses=[...new Set((result.stderr??'').match(/\b[A-Za-z]+(?:Error|Exception):/g)??[])];
+  report?.warnings.push('Execution diagnostic: '+substage+'; exit '+result.status+'; exception classes '+errorClasses.join(','));
+  throw new Error('Execution failed at '+substage);
+ }
  return result.stdout;
 }
 const dc=(args,input)=>command('docker',['compose','--project-name',project,'--file',compose,...args],input);

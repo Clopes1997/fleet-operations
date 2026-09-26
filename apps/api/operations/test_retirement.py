@@ -11,7 +11,8 @@ from trucks.models import Truck
 
 class RetirementAcceptance(TestCase):
     def source(self):
-        fixture = Path(os.environ.get("FLEET_RETIREMENT_FIXTURE", str(Path(__file__).resolve().parents[3] / "tools/migration/fixtures/fleet-source.json")))
+        configured = os.environ.get("FLEET_RETIREMENT_FIXTURE")
+        fixture = Path(configured) if configured else Path(__file__).resolve().parents[3] / "tools/migration/fixtures/fleet-source.json"
         return json.loads(fixture.read_text())
     def test_import_exact_money_references_history_and_repeat(self):
         source = self.source()
