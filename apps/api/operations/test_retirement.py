@@ -86,10 +86,24 @@ class RetirementAcceptance(TestCase):
         self.assertEqual(result.status_code,200,result.data)
         self.assertEqual(OrderTransition.objects.count(),2)
         self.assertEqual(client.post("/api/trucks/",{"license_plate":"ABC1D23","brand":"Other","model":"Other","manufacturing_year":2020}).status_code,400)
-    def test_history_gaps_and_equal_timestamp_order_require_review(self):
+    def test_history_gaps_require_review(self):
         source=self.source()
         source["rows"][3]["next_status"]="concluido"
         self.assertEqual(preflight(source)[2]["status"],"REQUIRES_REVIEW")
+    def test_skipped_financial_values_remain_in_source_totals(self):
+        source=self.source()
+        source["rows"].append({"type":"order","id":"archival","customer_snapshot":"Archived only","description":"Evidence","quoted_value":"12.34","deadline":"2024-01-01","status":"concluido"})
+        decisions={"sourceSha256":digest(source),"decisions":{"order:archival":{"action":"skip","reason":"Explicit owner review"}}}
+        apply_reviewed(source,decisions)
+        report=reconcile(source)
+        self.assertEqual(report["status"],"REQUIRES_REVIEW")
+        self.assertEqual(report["totals"]["source"]["quotes"],"12.63")
+        self.assertEqual(report["totals"]["target"]["quotes"],"0.29")
+        self.assertEqual(report["counts"]["target"]["vehicleArchived"],1)
+    def test_invalid_fipe_metadata_cannot_break_target_serialization(self):
+        source=self.source();source["rows"][1]["fipe_metadata"]="invalid"
+        self.assertEqual(preflight(source)[2]["status"],"FAIL")
+    def test_equal_history_timestamps_require_review(self):
         source=self.source()
         source["rows"].append({**source["rows"][3],"id":"h2","previous_status":"em_andamento","next_status":"concluido"})
         source["rows"][2]["status"]="concluido"

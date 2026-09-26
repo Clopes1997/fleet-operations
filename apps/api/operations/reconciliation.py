@@ -93,6 +93,8 @@ def validate_row(row):
             raise ValueError("Invalid plate")
         data["fipe_price"] = decimal_value(row["fipe_price"]) if row.get("fipe_price") is not None else None
         data.setdefault("fipe_metadata", {"legacy": True})
+        if not isinstance(data["fipe_metadata"], dict):
+            raise ValueError("FIPE metadata must be an object")
         if row.get("customer") is not None:
             raise ValueError("Vehicle ownership is not represented; preserve and review separately")
     if kind == "order":
@@ -297,6 +299,12 @@ def reconcile(raw):
     for row in bundle["rows"]:
         kind, key = row["type"], row["type"] + ":" + row["id"]
         counts["source"][kind] = counts["source"].get(kind, 0) + 1
+        expected = validate_row(row)
+        if expected.get("deleted_at"):
+            counts["source"][kind + "Archived"] = counts["source"].get(kind + "Archived", 0) + 1
+        for total, field in (("quotes", "quoted_value"), ("valuations", "fipe_price")):
+            if expected.get(field) is not None:
+                totals["source"][total] = format(Decimal(totals["source"][total]) + expected[field], ".2f")
         mapping = ImportRecord.objects.filter(**identity(bundle, row)).first()
         if not mapping or mapping.fingerprint != digest(row["_raw"]):
             differences.append({"key": key, "code": "MISSING_OR_CHANGED_MAPPING"})
@@ -308,7 +316,6 @@ def reconcile(raw):
         if not obj:
             differences.append({"key": key, "code": "MISSING_TARGET"})
             continue
-        expected = validate_row(row)
         for field, ref_kind in REFS.get(kind, {}).items():
             ref = row.get(field)
             parent = ImportRecord.objects.filter(source=bundle["source"], installation=bundle["installation"], entity="reviewed-" + ref_kind, legacy_id=str(ref)).first() if ref is not None else None
@@ -320,10 +327,11 @@ def reconcile(raw):
         if digest(actual) != mapping.payload.get("observedSha256"):
             differences.append({"key": key, "code": "TARGET_CHANGED"})
         counts["target"][kind] = counts["target"].get(kind, 0) + 1
+        if actual.get("deleted_at"):
+            counts["target"][kind + "Archived"] = counts["target"].get(kind + "Archived", 0) + 1
         for total, field in (("quotes", "quoted_value"), ("valuations", "fipe_price")):
             if field in expected and expected[field] is not None:
-                for side, value in (("source", expected[field]), ("target", actual[field])):
-                    totals[side][total] = format(Decimal(totals[side][total]) + Decimal(value), ".2f")
+                totals["target"][total] = format(Decimal(totals["target"][total]) + Decimal(actual[field]), ".2f")
         identities.append({"key": key, "targetId": obj.pk, "installation": bundle["installation"]})
         rows.append({"key": key, "sha256": digest(actual)})
     return {"status": "FAIL" if differences else "REQUIRES_REVIEW" if skipped else "PASS",
