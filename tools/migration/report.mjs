@@ -3,7 +3,7 @@ import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-export const statuses=['PASS','FAIL','REQUIRES_REVIEW','NOT_RUN'];
+export const statuses=['PASS','FAIL','REQUIRES_REVIEW','NOT_RUN','N/A'];
 export const mandatoryGates=['preflight','source_snapshot','isolated_target','import','reconciliation','acceptance','restart_persistence','backup_restore','rollback','real_source'];
 export const fingerprint=bytes=>createHash('sha256').update(bytes).digest('hex');
 export function newReport({project,source,snapshot,commit,dirty,timestamp=new Date().toISOString()}) {
@@ -15,15 +15,28 @@ export function newReport({project,source,snapshot,commit,dirty,timestamp=new Da
  counts:{source:{},target:{}},totals:{source:{},target:{}},identities:[],integrityChecks:[],discrepancies:[],warnings:[],manualReviews:[],automatedTests:[],
  restore:{status:'NOT_RUN'},rollback:{status:'NOT_RUN'},mappingPolicy:{},blockers:[],readiness:'NOT_READY',ownerAcceptance:'NOT_RUN',sourceArchivalAuthorized:false};
 }
+export function applyProofOfConceptDecision(report) {
+ if(!['inventory-platform','fleet-operations'].includes(report.project)||report.source.kind!=='synthetic')throw new Error('Decision only covers synthetic rehearsals of the named proof-of-concept sources');
+ report.ownerDecisions={id:'owner-2026-09-26-no-production-data',project:report.project,noProductionData:true,noLegacyProductionDeployment:true};
+ report.gates.real_source={status:'N/A',evidence:['Owner decision 2026-09-26: no production data existed; synthetic evidence is not a historical migration']};
+ report.legacyVersionRollback={status:'N/A',evidence:['Owner decision 2026-09-26: legacy application was proof of concept with no production data/deployment requiring cross-version rollback']};
+}
+function validExemption(report,name) {
+ return name==='real_source'&&['inventory-platform','fleet-operations'].includes(report.project)&&report.source.kind==='synthetic'
+  &&report.ownerDecisions?.id==='owner-2026-09-26-no-production-data'&&report.ownerDecisions.project===report.project
+  &&report.ownerDecisions.noProductionData===true&&report.ownerDecisions.noLegacyProductionDeployment===true
+  &&report.gates.real_source.evidence?.length>0;
+}
 export function setGate(report,name,status,evidence=[]) {
  if(!mandatoryGates.includes(name)||!statuses.includes(status))throw new Error('Unknown gate/status');
+ if(status==='N/A')throw new Error('N/A requires a scoped owner decision, not a generic gate override');
  if(status==='PASS'&&!evidence.length)throw new Error('PASS requires evidence');
  if(evidence.some(e=>typeof e!=='string'))throw new Error('Use safe evidence labels');
  report.gates[name]={status,evidence};
 }
 export function finalize(report) {
- if(report.source.kind!=='real')report.gates.real_source={status:'NOT_RUN',evidence:['Synthetic fixtures do not prove real-source migration']};
- const incomplete=mandatoryGates.filter(name=>report.gates[name]?.status!=='PASS');
+ if(report.source.kind!=='real'&&!validExemption(report,'real_source'))report.gates.real_source={status:'NOT_RUN',evidence:['Synthetic fixtures do not prove real-source migration']};
+ const incomplete=mandatoryGates.filter(name=>report.gates[name]?.status!=='PASS'&&!(report.gates[name]?.status==='N/A'&&validExemption(report,name)));
  report.blockers=[...new Set([...report.blockers,...incomplete.map(name=>name+': '+report.gates[name]?.status)])];
  if(report.target.dirty)report.warnings=[...new Set([...report.warnings,'Dirty working tree does not uniquely identify target execution'])];
  const unresolvedReviews=report.manualReviews.filter(item=>item.status!=='PASS');
@@ -38,7 +51,7 @@ export function markdown(report) {
  '\n\n| Gate | Status | Evidence |\n| --- | --- | --- |\n'+Object.entries(report.gates).map(([name,g])=>'| '+name+' | '+g.status+' | '+escape(g.evidence.join('; '))+' |').join('\n')+
  '\n\n## Reconciliation\n\n'+JSON.stringify({counts:report.counts,totals:report.totals,integrityChecks:report.integrityChecks},null,2)+
  '\n\n## Review and blockers\n\n'+[...report.blockers,...report.warnings,...report.discrepancies.map(d=>JSON.stringify(d))].map(v=>'- '+escape(v)).join('\n')+
- '\n\n## Mapping, provenance and acceptance evidence\n\n'+JSON.stringify({identities:report.identities,mappingPolicy:report.mappingPolicy,manualReviews:report.manualReviews,automatedTests:report.automatedTests,restore:report.restore,rollback:report.rollback},null,2)+
+ '\n\n## Mapping, provenance and acceptance evidence\n\n'+JSON.stringify({ownerDecisions:report.ownerDecisions,legacyVersionRollback:report.legacyVersionRollback,identities:report.identities,mappingPolicy:report.mappingPolicy,manualReviews:report.manualReviews,automatedTests:report.automatedTests,restore:report.restore,rollback:report.rollback},null,2)+
  '\n\nOwner acceptance: NOT_RUN. Source archival: not authorized.\n';
 }
 export async function writeReports(report,output) {

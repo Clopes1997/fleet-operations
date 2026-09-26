@@ -170,3 +170,6 @@ The customer/vehicle suggestion lists show the first page; an explicit reviewed 
 reference later records. Core list views preserve pagination. Historical sources, plate
 reuse, organization ownership and quoted-value meaning still require reconciliation.
 No legacy application, credential or production data has been removed or cut over.
+
+
+Retirement scope and owner decisions (2026-09-26) are recorded in [RETIREMENT.md](RETIREMENT.md). Passing automated checks does not authorize deletion or archival of the source.

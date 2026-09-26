@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {spawnSync,execFileSync} from 'node:child_process';
 import {createServer} from 'node:net';
-import {newReport,setGate,writeReports,fingerprint} from './report.mjs';
+import {applyProofOfConceptDecision,newReport,setGate,writeReports,fingerprint} from './report.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),options={};
 const args=process.argv.slice(2);
 for(let i=0;i<args.length;i+=2){
@@ -42,6 +42,11 @@ try{
   report.mappingPolicy.decisionsSha256=fingerprint(decisions);decisionArgs.push('--decisions','/rehearsal/decisions.json');
  }
  setGate(report,'source_snapshot','PASS',['Read-only source copy and SHA-256 recorded']);
+ if(options['--kind']==='synthetic')applyProofOfConceptDecision(report);
+ else {
+  report.legacyVersionRollback={status:'REQUIRES_REVIEW',evidence:['Future real installations are outside the owner proof-of-concept exemption']};
+  report.manualReviews.push({id:'real-installation-version-boundary',status:'REQUIRES_REVIEW',evidence:'Review actual deployment versions and post-snapshot writes before cutover'});
+ }
  if(options['--kind']==='real')setGate(report,'real_source','PASS',['Operator supplied real source; ownership remains subject to review']);
  project='migration-fleet-'+randomUUID().slice(0,8);
  const password=randomBytes(32).toString('hex'),port=await unusedPort();
@@ -111,8 +116,8 @@ try{
  stage='rollback';env.DB_HOST='db';substage='rollback-app';dc(['up','--detach','--force-recreate','backend']);dc(['restart','web']);
  const rolled=await step('reconcile','rolled-back.json');
  if(rolled.status!=='PASS'||JSON.stringify(rolled.observed)!==JSON.stringify(before.observed))throw new Error('Rollback mismatch');
- report.rollback={status:'REQUIRES_REVIEW',routingRestoration:'PASS',applicationVersion:report.target.commit,reason:'Same-version DB routing rollback verified; previous production version and post-cutover writes unknown'};
- setGate(report,'rollback','REQUIRES_REVIEW',['Same-version rollback demonstrated; real application version boundary requires owner review']);
+ report.rollback={status:'PASS',routingRestoration:'PASS',applicationVersion:report.target.commit,reason:'Same-version disposable database routing rollback verified; historical deployment scope recorded separately'};
+ setGate(report,'rollback','PASS',['Same-version database routing restored and persisted state compared']);
  if(fingerprint(await readFile(sourcePath))!==report.snapshot.sha256)throw new Error('Source changed');
  report.warnings.push('Only source-linked imported records enter reconciliation totals; browser acceptance creates separate disposable test orders. SQL and raw snapshots remain private.');
 }catch{

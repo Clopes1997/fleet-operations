@@ -109,20 +109,36 @@ Automated rollback switches database routing at the same application commit. Act
 rollback needs the previous application image and a compatible database snapshot. Stop writes
 before the final snapshot/cutover, compare restored data and agree a write-free acceptance
 window. Restoring an older snapshot after new writes loses those writes unless separately
-reconciled. Do not run backward schema migrations on live data. Real version rollback,
-downtime and consistency boundaries remain REQUIRES_REVIEW until a production baseline and
-owner-approved cutover plan exist.
+reconciled. Do not run backward schema migrations on live data. For these legacy proof-of-concept sources, historical version rollback is N/A. Future production deployments must define their own version, downtime and consistency boundaries.
 
 
 Source → Backup → Isolated restore → Preflight → Migration → Reconciliation → Acceptance tests → Restore/rollback test → Human review → Cutover approval → Source archival
 
 **Passing automated checks does not authorize deletion or archival of the source.**
 
+## Owner scope decision � 2026-09-26
+
+The superseded legacy sources were proof-of-concept/development applications only.
+No production data or production deployment existed. Therefore **real_source is N/A �
+no production data existed**. Zero-byte database placeholders require no migration.
+No further search for a production export is required.
+
+**legacyVersionRollback is N/A � no legacy production data/deployment required
+cross-version rollback**. This is separate from the mandatory rollback gate: the
+consolidated application's same-version database routing, backup creation, isolated
+restore, restart and observed-state comparison must still PASS. Synthetic fixtures test
+migration machinery; they do not represent historical production data.
+
+The scoped decision is recorded by applyProofOfConceptDecision in the report contract,
+only for Inventory/Fleet synthetic rehearsals. It cannot exempt failed tests, restore
+or any other automated gate. Future real imports require their own evidence and review.
+Final owner acceptance and repository archival approval remain outstanding.
+
 ## Report contract
 
 All projects use version 1 of tools/migration/report.mjs with migration-report.json and migration-report.md outputs. Copies live in each independent monorepo without a cross-repository runtime dependency.
 
-PASS requires evidence. FAIL means a proven failure. REQUIRES_REVIEW means an unresolved semantic decision. NOT_RUN means absent execution evidence. Every mandatory gate must pass against a real source before READY_FOR_OWNER_ACCEPTANCE. Synthetic fixtures never satisfy real_source. Owner acceptance and archival authorization are never inferred. Dirty code blocks readiness.
+PASS requires evidence. FAIL means a proven failure. REQUIRES_REVIEW means an unresolved semantic decision. NOT_RUN means absent execution evidence. Every applicable mandatory gate must pass before READY_FOR_OWNER_ACCEPTANCE. Synthetic fixtures never count as a successful real-source migration. N/A requires the explicit scoped owner decision below; it is neither PASS nor missing evidence. Generic inspection cannot grant exemptions. Owner acceptance and archival authorization are never inferred. Dirty code blocks readiness.
 
 The snapshot command only fingerprints/parses JSON and records unexecuted gates. It is not an import or restore test:
 
@@ -141,4 +157,4 @@ Read source copies only. Use a separate disposable target and unique database na
 
 Rollback freezes writes and restores the compatible database and application version before reopening access. Do not run old code against a new schema. Post-cutover writes require explicit reconciliation; rollback may require downtime and must not silently discard them. Personal rollback uses browser backup restore and revision/stale-tab checks.
 
-Adapters must record currency, units, timestamp interpretation and identity decisions. Never guess timezones, round silently or fuzzy-merge. Missing real snapshots remain NOT_RUN. Generated fixtures are labeled synthetic and cannot establish legacy retirement readiness.
+Adapters must record currency, units, timestamp interpretation and identity decisions. Never guess timezones, round silently or fuzzy-merge. Unresolved real-source requirements remain NOT_RUN. The owner-confirmed Inventory/Fleet proof-of-concept sources are explicitly exempt; generated fixtures remain labeled synthetic.

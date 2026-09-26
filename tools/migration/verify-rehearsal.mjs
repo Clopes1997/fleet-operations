@@ -2,12 +2,12 @@ import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 export function verifyRehearsal(report) {
- for(const gate of ['preflight','source_snapshot','isolated_target','import','reconciliation','acceptance','restart_persistence','backup_restore']){
+ for(const gate of ['preflight','source_snapshot','isolated_target','import','reconciliation','acceptance','restart_persistence','backup_restore','rollback']){
   if(report.gates?.[gate]?.status!=='PASS')throw new Error('Required synthetic rehearsal gate did not pass: '+gate);
  }
  if(report.restore?.status!=='PASS'||report.rollback?.routingRestoration!=='PASS')throw new Error('Restore/rollback execution evidence missing');
- if(report.source.kind!=='synthetic'||report.gates.real_source.status!=='NOT_RUN')throw new Error('Synthetic CI must not claim real-source evidence');
- if(report.readiness!=='NOT_READY'||report.ownerAcceptance!=='NOT_RUN'||report.sourceArchivalAuthorized!==false)throw new Error('Unexpected retirement authorization');
+ if(report.source.kind!=='synthetic'||report.gates.real_source.status!=='N/A'||report.ownerDecisions?.id!=='owner-2026-09-26-no-production-data'||report.legacyVersionRollback?.status!=='N/A')throw new Error('Synthetic CI must not claim real-source evidence');
+ if(report.readiness!=='READY_FOR_OWNER_ACCEPTANCE'||report.ownerAcceptance!=='NOT_RUN'||report.sourceArchivalAuthorized!==false)throw new Error('Unexpected retirement authorization');
  if(report.target.dirty||report.discrepancies.length)throw new Error('Unreconciled or dirty target');
  return true;
 }
