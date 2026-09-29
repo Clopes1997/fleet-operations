@@ -1,26 +1,27 @@
+import { clearValidation, localizeValidation } from "./lib/validation";
 import { useEffect, useState } from "react";
 import { TruckList } from "./components/TruckList";
-import { Customers, Imports, ServiceOrders, Valuation } from "./Operations";
+import { Customers, ServiceOrders, Valuation } from "./Operations";
 import api from "./services/api";
 import "./operations.css";
 export default function FleetApp() {
   const [authenticated, setAuthenticated] = useState<boolean>(),
     [error, setError] = useState(""),
-    [tab, setTab] = useState("Fleet");
+    [tab, setTab] = useState("Frota");
   useEffect(() => {
     api
       .get("/session/")
       .then((r) => setAuthenticated(r.data.authenticated))
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(e instanceof Error ? e.message : "Não foi possível concluir a operação."));
   }, []);
   if (authenticated === undefined)
     return (
       <main className="container p-8">
-        <p>{error || "Loading session…"}</p>
+        <p>{error || "Carregando sessão…"}</p>
       </main>
     );
   return (
-    <main className="container mx-auto p-6">
+    <main className={authenticated ? "fleet-app" : "fleet-login"} onInvalidCapture={localizeValidation} onInputCapture={clearValidation}>
       {error && <p role="alert">{error}</p>}
       {!authenticated ? (
         <form
@@ -36,17 +37,17 @@ export default function FleetApp() {
               setError("");
               setAuthenticated(true);
             } catch (e) {
-              setError(String(e));
+              setError(e instanceof Error ? e.message : "Não foi possível concluir a operação.");
             }
           }}
         >
-          <h1>Fleet operations</h1>
+          <h1>Operações de frota</h1>
           <label>
-            Username
+            Usuário
             <input name="username" autoComplete="username" required />
           </label>
           <label>
-            Password
+            Senha
             <input
               name="password"
               type="password"
@@ -54,12 +55,15 @@ export default function FleetApp() {
               required
             />
           </label>
-          <button>Sign in</button>
+          <button>Entrar</button>
         </form>
       ) : (
         <>
-          <nav aria-label="Modules" className="mb-6">
-            {["Fleet", "Customers", "Service orders", "FIPE", "Imports"].map(
+          <aside className="fleet-sidebar">
+          <div className="fleet-brand"><span>FO</span>Operações de frota</div>
+          <p className="fleet-menu-label">Área de trabalho</p>
+          <nav aria-label="Módulos">
+            {["Frota", "Clientes", "Ordens de serviço", "FIPE"].map(
               (t) => (
                 <button
                   key={t}
@@ -76,24 +80,28 @@ export default function FleetApp() {
                   await api.post("/logout/");
                   setAuthenticated(false);
                 } catch (e) {
-                  setError(String(e));
+                  setError(e instanceof Error ? e.message : "Não foi possível concluir a operação.");
                 }
               }}
             >
-              Sign out
+              Sair
             </button>
           </nav>
-          {tab === "Fleet" ? (
+          </aside>
+          <div className="fleet-content">
+          <header className="fleet-header"><h1>{tab}</h1><p>Gerencie sua frota, clientes e ordens de serviço.</p></header>
+          <div className="fleet-card">
+          {tab === "Frota" ? (
             <TruckList />
-          ) : tab === "Customers" ? (
+          ) : tab === "Clientes" ? (
             <Customers />
-          ) : tab === "Service orders" ? (
+          ) : tab === "Ordens de serviço" ? (
             <ServiceOrders />
-          ) : tab === "FIPE" ? (
-            <Valuation />
           ) : (
-            <Imports />
+            <Valuation />
           )}
+          </div>
+          </div>
         </>
       )}
     </main>

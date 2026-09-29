@@ -43,28 +43,6 @@ class OperationsTests(TestCase):
         self.assertEqual(self.client.patch(url, {"description": "stale", "version": 0}).status_code, 400)
         self.assertEqual(OrderTransition.objects.count(), 2)
 
-    def test_import_preview_idempotency_no_fake_history(self):
-        bundle = {"version": 1, "source": "service-orders", "installation": "office", "rows": [
-            {"id": 1, "cliente": "Same name", "descricao": "Old job", "valor": "123.45", "prazo": "2020-02-29", "status": "concluido"}]}
-        self.assertEqual(self.client.post("/api/imports/preview/", bundle, format="json").data["new"], 1)
-        self.assertEqual(ServiceOrder.objects.count(), 0)
-        self.assertEqual(self.client.post("/api/imports/apply/", bundle, format="json").data["imported"], 1)
-        self.assertEqual(self.client.post("/api/imports/apply/", bundle, format="json").data["skipped"], 1)
-        order = ServiceOrder.objects.get()
-        self.assertEqual(order.quoted_value, Decimal("123.45"))
-        self.assertIsNone(order.customer_id)
-        self.assertIsNone(order.vehicle_id)
-        self.assertEqual(OrderTransition.objects.count(), 0)
-        bundle["rows"][0]["valor"] = "9.00"
-        self.assertEqual(self.client.post("/api/imports/apply/", bundle, format="json").status_code, 400)
-
-    def test_invalid_bundle_is_atomic(self):
-        bundle = {"version": 1, "source": "service-orders", "installation": "office", "rows": [
-            {"id": 1, "cliente": "A", "descricao": "Job", "valor": "12.34", "prazo": "2020-01-01", "status": "pendente"},
-            {"id": 2, "cliente": "B", "descricao": "Job", "valor": "1.001", "prazo": "bad", "status": "pendente"}]}
-        self.assertEqual(self.client.post("/api/imports/apply/", bundle, format="json").status_code, 400)
-        self.assertEqual(ServiceOrder.objects.count(), 0)
-
     def test_archived_vehicle_preserves_linked_history(self):
         truck = Truck.objects.create(license_plate="ABC1234", brand="A", model="B", manufacturing_year=2020)
         order = ServiceOrder.objects.create(**self.data, vehicle=truck)

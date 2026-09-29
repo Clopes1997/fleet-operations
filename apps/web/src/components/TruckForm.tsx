@@ -3,7 +3,6 @@ import { truckService, TruckFormData } from '@/services/api'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
-import axios from 'axios'
 
 interface TruckFormProps {
   truckId?: number | null
@@ -30,7 +29,7 @@ export const TruckForm = ({ truckId, onSuccess, onCancel }: TruckFormProps) => {
           model: truck.model,
           manufacturing_year: truck.manufacturing_year,
         })
-      })
+      }).catch((error: unknown) => setError(error instanceof Error ? error.message : "Erro ao carregar caminhão"))
     }
   }, [truckId])
 
@@ -46,31 +45,8 @@ export const TruckForm = ({ truckId, onSuccess, onCancel }: TruckFormProps) => {
         await truckService.create(formData)
       }
       onSuccess()
-    } catch (err: any) {
-      if (axios.isAxiosError(err)) {
-        const errorData = err.response?.data
-        if (errorData) {
-          if (typeof errorData === 'string') {
-            setError(errorData)
-          } else if (errorData.non_field_errors) {
-            setError(Array.isArray(errorData.non_field_errors) 
-              ? errorData.non_field_errors.join(', ') 
-              : errorData.non_field_errors)
-          } else {
-            const fieldErrors = Object.entries(errorData)
-              .map(([field, messages]) => {
-                const msg = Array.isArray(messages) ? messages.join(', ') : String(messages)
-                return `${field}: ${msg}`
-              })
-              .join('\n')
-            setError(fieldErrors || 'Erro ao salvar caminhão')
-          }
-        } else {
-          setError(err.message || 'Erro ao salvar caminhão')
-        }
-      } else {
-        setError('Erro ao salvar caminhão')
-      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar caminhão');
     } finally {
       setLoading(false)
     }

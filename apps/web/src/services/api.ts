@@ -12,19 +12,18 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const data = error.response?.data;
-    const detail =
-      data && typeof data === "object"
-        ? Object.entries(data)
-            .map(
-              ([key, value]) =>
-                key +
-                ": " +
-                (typeof value === "string" ? value : JSON.stringify(value)),
-            )
-            .join("; ")
-        : error.message;
-    return Promise.reject(new Error(detail || "Request failed"));
+    const status = error.response?.status;
+    const fields: Record<string, string> = { license_plate: "Placa", brand: "Marca", model: "Modelo", manufacturing_year: "Ano de fabricação", deadline: "Prazo", quoted_value: "Valor do orçamento", customer: "Cliente", vehicle: "Veículo", customer_snapshot: "Nome do cliente", description: "Descrição", status: "Situação", display_name: "Nome" };
+    const invalid = Object.keys(error.response?.data ?? {}).filter(key => key in fields).map(key => fields[key]);
+    const detail = !error.response ? "Não foi possível conectar ao servidor. Verifique a conexão e tente novamente."
+      : status === 401 ? "Sessão expirada. Entre novamente."
+      : status === 403 ? "Acesso negado. Verifique suas credenciais, permissões ou atualize a página."
+      : status === 404 ? "Registro não encontrado. Atualize a página."
+      : status === 409 ? "Este registro foi alterado ou está em uso. Atualize a página antes de tentar novamente."
+      : status === 400 ? (invalid.length ? `Confira os campos: ${invalid.join(", ")}. Os valores são inválidos ou entram em conflito com um registro existente.` : "Não foi possível concluir a operação. Confira os dados e atualize a página antes de tentar novamente.")
+      : status === 429 ? "Muitas tentativas. Aguarde e tente novamente."
+      : "O serviço está indisponível. Tente novamente em instantes.";
+    return Promise.reject(new Error(detail));
   },
 );
 

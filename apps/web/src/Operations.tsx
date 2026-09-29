@@ -1,3 +1,5 @@
+import { DateInput } from "./components/DateInput";
+import { formatDate } from "./lib/calendar";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import api, { type Truck } from "./services/api";
@@ -25,10 +27,11 @@ type Order = {
     occurred_at: string;
   }[];
 };
+const statusLabels: Record<string, string> = { pendente: "Pendente", em_andamento: "Em andamento", concluido: "Concluído", cancelado: "Cancelado" };
 const statuses = ["pendente", "em_andamento", "concluido", "cancelado"];
 const field = (d: FormData, k: string) => String(d.get(k) ?? "").trim();
 function message(e: unknown) {
-  return e instanceof Error ? e.message : String(e);
+  return e instanceof Error ? e.message : "Não foi possível concluir a operação.";
 }
 export function ServiceOrders() {
   const [orders, setOrders] = useState<Page<Order>>({
@@ -99,10 +102,9 @@ export function ServiceOrders() {
   }
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-bold">Service orders</h1>
+      <h1 className="text-2xl font-bold">Ordens de serviço</h1>
       <p>
-        Quoted amounts are distinct from FIPE valuations. Customer and vehicle
-        links are optional.
+        Os valores orçados são independentes da avaliação FIPE. Os vínculos com cliente e veículo são opcionais.
       </p>
       {error && (
         <p role="alert" className="text-red-700">
@@ -111,7 +113,7 @@ export function ServiceOrders() {
       )}
       <form key={editing?.id ?? "new"} onSubmit={save} className="fleet-form">
         <label>
-          Customer snapshot
+          Nome do cliente na ordem
           <input
             name="customer_snapshot"
             required
@@ -120,7 +122,7 @@ export function ServiceOrders() {
           />
         </label>
         <label>
-          Reviewed customer ID
+          ID do cliente
           <input
             name="customer"
             type="number"
@@ -137,7 +139,7 @@ export function ServiceOrders() {
           ))}
         </datalist>
         <label>
-          Vehicle ID
+          ID do veículo
           <input
             name="vehicle"
             type="number"
@@ -154,7 +156,7 @@ export function ServiceOrders() {
           ))}
         </datalist>
         <label>
-          Description
+          Descrição
           <textarea
             name="description"
             required
@@ -162,7 +164,7 @@ export function ServiceOrders() {
           />
         </label>
         <label>
-          Quoted amount
+          Valor do orçamento
           <input
             name="quoted_value"
             inputMode="decimal"
@@ -172,34 +174,33 @@ export function ServiceOrders() {
           />
         </label>
         <label>
-          Deadline
-          <input
+          Prazo
+          <DateInput
             name="deadline"
-            type="date"
             required
             defaultValue={editing?.deadline}
           />
         </label>
         <label>
-          Status
+          Situação
           <select name="status" defaultValue={editing?.status ?? "pendente"}>
             {(editing ? statuses : ["pendente"]).map((s) => (
-              <option key={s}>{s}</option>
+              <option key={s} value={s}>{statusLabels[s]}</option>
             ))}
           </select>
         </label>
         <button disabled={busy}>
-          {editing ? "Save order" : "Create order"}
+          {editing ? "Salvar ordem" : "Criar ordem"}
         </button>
         {editing && (
           <button type="button" onClick={() => setEditing(undefined)}>
-            Cancel edit
+            Cancelar edição
           </button>
         )}
       </form>
       <div className="fleet-form">
         <label>
-          Search orders
+          Buscar ordens
           <input
             value={search}
             onChange={(e) => {
@@ -209,7 +210,7 @@ export function ServiceOrders() {
           />
         </label>
         <label>
-          Filter status
+          Filtrar por situação
           <select
             value={status}
             onChange={(e) => {
@@ -217,30 +218,30 @@ export function ServiceOrders() {
               setPage(1);
             }}
           >
-            <option value="">All</option>
+            <option value="">Todas</option>
             {statuses.map((s) => (
-              <option key={s}>{s}</option>
+              <option key={s} value={s}>{statusLabels[s]}</option>
             ))}
           </select>
         </label>
       </div>
       <p>
-        {orders.count} orders. Page {page}
+        {orders.count} {orders.count === 1 ? "ordem" : "ordens"}. Página {page}
       </p>
       <button disabled={!orders.previous} onClick={() => setPage((p) => p - 1)}>
-        Previous
+        Anterior
       </button>
       <button disabled={!orders.next} onClick={() => setPage((p) => p + 1)}>
-        Next
+        Próxima
       </button>
       <table className="w-full text-left">
         <thead>
           <tr>
-            <th>ID / Customer</th>
-            <th>Deadline</th>
-            <th>Quote</th>
-            <th>Status</th>
-            <th>Actions</th>
+            <th>ID / Cliente</th>
+            <th>Prazo</th>
+            <th>Orçamento</th>
+            <th>Situação</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -249,16 +250,16 @@ export function ServiceOrders() {
               <td>
                 {o.id} / {o.customer_snapshot}
               </td>
-              <td>{o.deadline}</td>
+              <td>{formatDate(o.deadline)}</td>
               <td>{o.quoted_value}</td>
-              <td>{o.status}</td>
+              <td>{statusLabels[o.status] ?? "Situação desconhecida"}</td>
               <td>
-                <button onClick={() => setEditing(o)}>Edit</button>
+                <button onClick={() => setEditing(o)}>Editar</button>
                 <button
                   onClick={async () => {
                     if (
                       !confirm(
-                        "Archive this order? Its history will be retained.",
+                        "Arquivar esta ordem? O histórico será preservado.",
                       )
                     )
                       return;
@@ -270,7 +271,7 @@ export function ServiceOrders() {
                     }
                   }}
                 >
-                  Archive
+                  Arquivar
                 </button>
               </td>
             </tr>
@@ -279,11 +280,11 @@ export function ServiceOrders() {
       </table>
       {editing && (
         <div>
-          <h2>Recorded transitions</h2>
+          <h2>Histórico de alterações</h2>
           <ul>
             {editing.transitions.map((t) => (
               <li key={t.id}>
-                {t.occurred_at}: {t.previous_status} → {t.next_status}
+                {t.occurred_at}: {statusLabels[t.previous_status]} → {statusLabels[t.next_status]}
               </li>
             ))}
           </ul>
@@ -313,7 +314,7 @@ export function Customers() {
   }, [page]);
   return (
     <section>
-      <h1 className="text-2xl font-bold">Customers</h1>
+      <h1 className="text-2xl font-bold">Clientes</h1>
       {error && <p role="alert">{error}</p>}
       <form
         className="fleet-form"
@@ -334,16 +335,16 @@ export function Customers() {
         }}
       >
         <label>
-          Display name
+          Nome
           <input name="name" maxLength={255} required />
         </label>
         <label>
-          Notes
+          Observações
           <input name="notes" />
         </label>
-        <button>Create customer</button>
+        <button>Cadastrar cliente</button>
       </form>
-      <p>{rows.count} customers</p>
+      <p>{rows.count} {rows.count === 1 ? "cliente" : "clientes"}</p>
       <ul>
         {rows.results.map((c) => (
           <li key={c.id}>
@@ -352,91 +353,11 @@ export function Customers() {
         ))}
       </ul>
       <button disabled={!rows.previous} onClick={() => setPage((p) => p - 1)}>
-        Previous
+        Anterior
       </button>
       <button disabled={!rows.next} onClick={() => setPage((p) => p + 1)}>
-        Next
+        Próxima
       </button>
-    </section>
-  );
-}
-export function Imports() {
-  const [bundle, setBundle] = useState<unknown>(),
-    [preview, setPreview] = useState<{
-      new: number;
-      skipped: number;
-      errors: { row: number; error: string }[];
-    }>(),
-    [error, setError] = useState(""),
-    [result, setResult] = useState(""),
-    [busy, setBusy] = useState(false);
-  return (
-    <section>
-      <h1 className="text-2xl font-bold">Legacy imports</h1>
-      <p>
-        Administrators can preview and apply reviewed JSON exports. No customer
-        or vehicle matching is inferred.
-      </p>
-      {error && <p role="alert">{error}</p>}
-      <label>
-        Import bundle
-        <input
-          type="file"
-          accept=".json"
-          disabled={busy}
-          onChange={async (e) => {
-            setPreview(undefined);
-            setBundle(undefined);
-            setError("");
-            const file = e.target.files?.[0];
-            if (!file) return;
-            try {
-              if (file.size > 2_000_000) throw Error("Maximum 2 MB per bundle");
-              const data = JSON.parse(await file.text());
-              setBusy(true);
-              const r = await api.post("/imports/preview/", data);
-              setBundle(data);
-              setPreview(r.data);
-            } catch (e) {
-              setError(message(e));
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
-      </label>
-      {preview && (
-        <div>
-          <p>
-            {preview.new} new, {preview.skipped} already imported
-          </p>
-          <ul>
-            {preview.errors.map((e, i) => (
-              <li key={i}>
-                Row {e.row}: {e.error}
-              </li>
-            ))}
-          </ul>
-          <button
-            disabled={busy || preview.errors.length > 0}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                const r = await api.post("/imports/apply/", bundle);
-                setResult("Imported " + r.data.imported + " records");
-                setPreview(undefined);
-              } catch (e) {
-                setError(message(e));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Apply reviewed import
-          </button>
-        </div>
-      )}
-      <p role="status">{result}</p>
     </section>
   );
 }
@@ -468,10 +389,9 @@ export function Valuation() {
   }, []);
   return (
     <section>
-      <h1 className="text-2xl font-bold">FIPE reference valuation</h1>
+      <h1 className="text-2xl font-bold">Avaliação de referência FIPE</h1>
       <p>
-        Select exact source codes. Verify that the FIPE model year and fuel
-        variant match the vehicle. This reference is not a service cost.
+        Selecione os códigos correspondentes ao veículo e confira o ano do modelo e o combustível. A referência FIPE não representa o custo do serviço.
       </p>
       {error && <p role="alert">{error}</p>}
       <form
@@ -484,14 +404,14 @@ export function Valuation() {
               model_code: model,
               year_code: year,
             });
-            setResult("Reference value: " + r.data.fipe_price + " BRL");
+            setResult("Valor de referência: " + r.data.fipe_price + " BRL");
           } catch (e) {
             setError(message(e));
           }
         }}
       >
         <label>
-          Vehicle ID
+          ID do veículo
           <input
             type="number"
             min="1"
@@ -501,7 +421,7 @@ export function Valuation() {
           />
         </label>
         <label>
-          FIPE brand
+          Marca FIPE
           <select
             required
             value={brand}
@@ -512,7 +432,7 @@ export function Valuation() {
               void load("models", { brand: e.target.value });
             }}
           >
-            <option value="">Select</option>
+            <option value="">Selecione</option>
             {options.brands?.map((o) => (
               <option key={o.code ?? o.codigo} value={o.code ?? o.codigo}>
                 {o.name ?? o.nome}
@@ -521,7 +441,7 @@ export function Valuation() {
           </select>
         </label>
         <label>
-          FIPE model
+          Modelo FIPE
           <select
             required
             value={model}
@@ -531,7 +451,7 @@ export function Valuation() {
               void load("years", { brand, model: e.target.value });
             }}
           >
-            <option value="">Select</option>
+            <option value="">Selecione</option>
             {options.models?.map((o) => (
               <option key={o.code ?? o.codigo} value={o.code ?? o.codigo}>
                 {o.name ?? o.nome}
@@ -540,13 +460,13 @@ export function Valuation() {
           </select>
         </label>
         <label>
-          FIPE model year / fuel
+          Ano do modelo / combustível FIPE
           <select
             required
             value={year}
             onChange={(e) => setYear(e.target.value)}
           >
-            <option value="">Select</option>
+            <option value="">Selecione</option>
             {options.years?.map((o) => (
               <option key={o.code ?? o.codigo} value={o.code ?? o.codigo}>
                 {o.name ?? o.nome}
@@ -554,7 +474,7 @@ export function Valuation() {
             ))}
           </select>
         </label>
-        <button>Save selected valuation</button>
+        <button>Salvar avaliação selecionada</button>
       </form>
       <p role="status">{result}</p>
     </section>

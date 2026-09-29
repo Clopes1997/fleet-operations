@@ -1,22 +1,14 @@
 # Fleet operations
 
-Migration validation now includes deterministic identity review, exact reconciliation and
-disposable MySQL backup/restore acceptance. See [Retirement Readiness](RETIREMENT.md) for
-commands, reusable review files and rollback boundaries. Passing checks never authorizes
-archival of a source repository or migration of an unknown production installation.
-
-A modular fleet and service-order application built from Trucks System, with the useful
-Service Orders workflow integrated into Django and React. It manages vehicles, reviewed
-customer records, generic or vehicle-linked service orders, deadlines, quoted values,
-lifecycle history and independent FIPE reference valuations.
+A fleet and service-order application for vehicles, customers, deadlines, quoted values, lifecycle history and FIPE reference valuations.
 
 ## Structure
 
 - `apps/api`: Django 5.2 / Django REST Framework; Fleet, Customers, Service Orders,
-  session authentication and reviewed imports.
+  session authentication.
 - `apps/web`: React 18 / TypeScript / Vite; existing truck forms/table retained.
 - MySQL 8.4 is the production database. SQLite profiles are explicitly local/test only.
-- Django migrations remain in their owning apps. `SOURCE_PROVENANCE.md` records origin.
+- Django migrations remain in their owning apps.
 
 Service orders may have null customer/vehicle links and always retain their customer text
 snapshot. Quoted amounts are decimal strings in the API and are not FIPE values, actual
@@ -119,57 +111,3 @@ do not remove populated volumes to redeploy.
 Django's database-backed application cannot be hosted by GitHub Pages alone. The configured
 path is a persistent container host; no Vercel serverless conversion is introduced.
 The frontend proxy exposes the application API, not the Django admin site.
-
-## Data migration
-
-Never run the old Service Orders drop/populate/depopulate migrations or endpoints against
-source data. Export consistent backups including archived rows. The target provides
-administrator-only `POST /api/imports/preview/` and `POST /api/imports/apply/`, also available
-in the Imports screen. The bundle is:
-
-```json
-{
-  "version": 1,
-  "source": "service-orders",
-  "installation": "office",
-  "rows": [{
-    "id": "123",
-    "cliente": "Original customer text",
-    "descricao": "Historical job",
-    "valor": "12.34",
-    "prazo": "2020-01-01",
-    "status": "concluido",
-    "deleted_at": null
-  }]
-}
-```
-
-For `source: "trucks-system"`, rows use `id, license_plate, brand, model,
-manufacturing_year, fipe_price, deleted_at`. Price/value fields must be decimal strings.
-Optional created_at/updated_at/deleted_at timestamps require explicit offsets; deadlines
-are plain calendar dates. Use 1–2000 rows and at most 2 MB per browser bundle.
-
-Imports are atomic, preserve source identity/fingerprint/raw payload and skip identical
-records. Changed identities and collisions require review. Customer/vehicle relationships
-are never inferred from matching names. Imported completed jobs do not get invented
-transition histories. Imports do not call FIPE.
-
-Active vehicle plates have a MySQL-compatible unique field. The additive migration checks
-existing active plates before schema changes and stops on invalid/duplicate plates. It
-does not delete or merge them. Back up and rehearse restoration before any in-place upgrade.
-
-## Known limitations and retirement gates
-
-Local verification uses SQLite; real MySQL locking/DDL and container deployment require
-the configured CI or a Docker/MySQL environment. FIPE tests mock the external service;
-live availability, source code selections and vehicle/model-year correctness need review.
-Old prices without metadata are shown as legacy references; vehicle edits do not silently
-request or replace them.
-
-The customer/vehicle suggestion lists show the first page; an explicit reviewed ID can
-reference later records. Core list views preserve pagination. Historical sources, plate
-reuse, organization ownership and quoted-value meaning still require reconciliation.
-No legacy application, credential or production data has been removed or cut over.
-
-
-Retirement scope and owner decisions (2026-09-26) are recorded in [RETIREMENT.md](RETIREMENT.md). Passing automated checks does not authorize deletion or archival of the source.

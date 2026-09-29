@@ -48,7 +48,7 @@ export const TruckList = () => {
   }
 
   const formatCurrency = (value: string | null) => {
-    if (value === null) return 'Not valued'
+    if (value === null) return 'Não avaliado'
     const num = parseFloat(value)
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -78,9 +78,9 @@ export const TruckList = () => {
   return (
     <>
       <div className="space-y-4">
-        <p>{pagination.count} vehicles. Page {page}. FIPE values without confirmed metadata are legacy references.</p>
-        <button disabled={!pagination.previous} onClick={()=>setPage(page-1)}>Previous</button>
-        <button disabled={!pagination.next} onClick={()=>setPage(page+1)}>Next</button>
+        <p>{pagination.count} {pagination.count === 1 ? 'veículo' : 'veículos'}. Página {page}. Valores FIPE sem metadados confirmados são referências não verificadas.</p>
+        <button disabled={!pagination.previous} onClick={()=>setPage(page-1)}>Anterior</button>
+        <button disabled={!pagination.next} onClick={()=>setPage(page+1)}>Próxima</button>
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">Gestão de Caminhões</h1>
           <Button onClick={() => setIsDialogOpen(true)}>
@@ -120,6 +120,7 @@ export const TruckList = () => {
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label={`Editar caminhão ${truck.license_plate}`}
                           onClick={() => handleEdit(truck.id)}
                         >
                           <Edit className="h-4 w-4" />
@@ -127,6 +128,7 @@ export const TruckList = () => {
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label={`Excluir caminhão ${truck.license_plate}`}
                           onClick={() => handleDelete(truck.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
