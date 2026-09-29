@@ -111,3 +111,23 @@ do not remove populated volumes to redeploy.
 Django's database-backed application cannot be hosted by GitHub Pages alone. The configured
 path is a persistent container host; no Vercel serverless conversion is introduced.
 The frontend proxy exposes the application API, not the Django admin site.
+
+## Public demo (GitHub Pages)
+
+Demo URL after activation: [Fleet Operations](https://clopes1997.github.io/fleet-operations/). Pages was disabled when checked on 2026-09-29; this URL is not yet verified live.
+
+Deploy from `main` using GitHub Actions. No separate demo branch or duplicated application is needed. The existing React UI uses a read-only local Axios adapter only in Vite demo mode; normal development and production builds retain the real API.
+
+From the repository root:
+
+```sh
+npm --prefix apps/web ci
+npm --prefix apps/web run build:demo
+npm --prefix apps/web run preview
+```
+
+Use `npm --prefix apps/web run dev:demo` for local demo development and `npm --prefix apps/web run test:demo` for adapter contract checks. Output: `apps/web/dist`. No demo secrets or environment variables are required. The build command selects `--mode demo`; never put backend credentials in Vite variables.
+
+Activation: commit and push these changes to main, choose **Settings → Pages → Source → GitHub Actions**, then run the Deploy public demo workflow on main. Subsequent main pushes deploy automatically; pull requests only verify. Confirm the successful deployment URL before marking the project Preview on the portfolio.
+
+Maintenance: Read-only fictional fixtures; writes and real integrations require the existing backend. Keep fixtures aligned with API response types when screens change. Unsupported requests fail locally instead of falling through to a server. Demo fixture code is omitted from normal production bundles. The existing container deployment remains the full-app production path. No server-side routing fallback is required. Relative demo assets work under the repository subpath.

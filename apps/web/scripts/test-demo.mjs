@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const source = readFileSync(new URL('../src/services/demo.ts', import.meta.url), 'utf8');
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const { demoAdapter } = await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'));
+const get = async (url, params = {}) => (await demoAdapter({ method: 'get', url, params })).data;
+assert.equal((await get('/session/')).authenticated, true);
+assert.equal((await get('/trucks/')).results.length, 2);
+assert.equal((await get('/orders/', { status: 'pendente' })).count, 1);
+assert.equal((await get('/orders/', { search: 'no match' })).count, 0);
+assert.deepEqual(await get('/trucks/fipe/'), []);
+const rows = await get('/trucks/'); rows.results[0].brand = 'changed';
+assert.equal((await get('/trucks/')).results[0].brand, 'Volvo');
+for (const method of ['post', 'put', 'patch', 'delete']) await assert.rejects(demoAdapter({ method, url: '/trucks/' }), /somente leitura/);
+await assert.rejects(get('/unknown'));
+console.log('Demo contracts passed: fixtures, filters, pagination, write rejection and unknown endpoints.');

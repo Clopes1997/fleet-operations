@@ -1,6 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
+  ...(import.meta.env.MODE === 'demo' ? { adapter: async (config) => (await import('./demo')).demoAdapter(config) } : {}),
   baseURL: "/api",
   xsrfCookieName: "csrftoken",
   xsrfHeaderName: "X-CSRFToken",
@@ -12,6 +13,7 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (import.meta.env.MODE === 'demo') return Promise.reject(error);
     const status = error.response?.status;
     const fields: Record<string, string> = { license_plate: "Placa", brand: "Marca", model: "Modelo", manufacturing_year: "Ano de fabricação", deadline: "Prazo", quoted_value: "Valor do orçamento", customer: "Cliente", vehicle: "Veículo", customer_snapshot: "Nome do cliente", description: "Descrição", status: "Situação", display_name: "Nome" };
     const invalid = Object.keys(error.response?.data ?? {}).filter(key => key in fields).map(key => fields[key]);

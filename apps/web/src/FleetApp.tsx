@@ -75,6 +75,7 @@ export default function FleetApp() {
               ),
             )}
             <button
+              disabled={import.meta.env.MODE === 'demo'}
               onClick={async () => {
                 try {
                   await api.post("/logout/");
@@ -89,7 +90,7 @@ export default function FleetApp() {
           </nav>
           </aside>
           <div className="fleet-content">
-          <header className="fleet-header"><h1>{tab}</h1><p>Gerencie sua frota, clientes e ordens de serviço.</p></header>
+          <header className="fleet-header">{import.meta.env.MODE === 'demo' && <p role="note">Demonstração somente leitura · Dados fictícios. Alterações e consultas FIPE exigem o backend.</p>}<h1>{tab}</h1><p>Gerencie sua frota, clientes e ordens de serviço.</p></header>
           <div className="fleet-card">
           {tab === "Frota" ? (
             <TruckList />
